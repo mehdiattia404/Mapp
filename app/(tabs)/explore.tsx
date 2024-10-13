@@ -1,102 +1,186 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Image, Platform } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { Text, View, StyleSheet, TouchableOpacity, Image, Modal, FlatList, PanResponder, StatusBar, Platform } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import ViewShot from 'react-native-view-shot';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 
-import { Collapsible } from '@/components/Collapsible';
-import { ExternalLink } from '@/components/ExternalLink';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const stickers = [
+  { id: '1', uri: 'https://example.com/sticker1.png' },
+  { id: '2', uri: 'https://example.com/sticker2.png' },
+  { id: '3', uri: 'https://example.com/sticker3.png' },
+  // Add more stickers as needed
+];
 
-export default function TabTwoScreen() {
+const Explore = () => {
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedSticker, setSelectedSticker] = useState<string | null>(null);
+  const [stickerPosition, setStickerPosition] = useState({ x: 0, y: 0 });
+  const stickerRef = useRef<any>(null);
+  const viewShotRef = useRef<ViewShot>(null);
+
+  const handleExplorePress = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permissionResult.granted === false) {
+      alert('Permission to access camera roll is required!');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync();
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0].uri);
+    }
+  };
+
+  const handleStickerPress = (uri: string) => {
+    setSelectedSticker(uri);
+    setModalVisible(false);
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        stickerRef.current.setNativeProps({ style: { zIndex: 1 } });
+      },
+      onPanResponderMove: (_, gestureState) => {
+        setStickerPosition({
+          x: gestureState.moveX - 50, // Adjust based on sticker size
+          y: gestureState.moveY - 50, // Adjust based on sticker size
+        });
+      },
+      onPanResponderRelease: () => {
+        stickerRef.current.setNativeProps({ style: { zIndex: 0 } });
+      },
+    })
+  ).current;
+
+  const takeScreenshot = async () => {
+    if (viewShotRef.current) {
+      try {
+        const uri = await viewShotRef.current.capture();
+        await saveScreenshot(uri);
+      } catch (error) {
+        console.error("Error taking screenshot: ", error);
+      }
+    }
+  };
+
+  const saveScreenshot = async (uri: string) => {
+    const permission = await MediaLibrary.requestPermissionsAsync();
+    if (permission.granted) {
+      const fileUri = `${FileSystem.documentDirectory}screenshot.png`;
+      await FileSystem.moveAsync({
+        from: uri,
+        to: fileUri,
+      });
+      alert('Screenshot saved to your media library!');
+    } else {
+      alert('Permission to save screenshots is required!');
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={<Ionicons size={310} name="code-slash" style={styles.headerImage} />}>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image source={require('@/assets/images/react-logo.png')} style={{ alignSelf: 'center' }} />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Custom fonts">
-        <ThemedText>
-          Open <ThemedText type="defaultSemiBold">app/_layout.tsx</ThemedText> to see how to load{' '}
-          <ThemedText style={{ fontFamily: 'SpaceMono' }}>
-            custom fonts such as this one.
-          </ThemedText>
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/versions/latest/sdk/font">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user's current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful <ThemedText type="defaultSemiBold">react-native-reanimated</ThemedText> library
-          to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#e0f7fa" />
+      <Text style={styles.title}>Explore Screen</Text>
+      <TouchableOpacity style={styles.button} onPress={handleExplorePress}>
+        <Text style={styles.buttonText}>Select an Image</Text>
+      </TouchableOpacity>
+      {selectedImage && <Image source={{ uri: selectedImage }} style={styles.image} />}
+      <TouchableOpacity style={styles.button} onPress={() => setModalVisible(true)}>
+        <Text style={styles.buttonText}>Show Stickers</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={takeScreenshot}>
+        <Text style={styles.buttonText}>Take Screenshot</Text>
+      </TouchableOpacity>
+
+      {/* Sticker Modal */}
+      <Modal visible={modalVisible} animationType="slide">
+        <View style={styles.modalContainer}>
+          <FlatList
+            data={stickers}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity onPress={() => handleStickerPress(item.uri)}>
+                <Image source={{ uri: item.uri }} style={styles.sticker} />
+              </TouchableOpacity>
+            )}
+          />
+          <TouchableOpacity style={styles.button} onPress={() => setModalVisible(false)}>
+            <Text style={styles.buttonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* ViewShot for Screenshot */}
+      <ViewShot ref={viewShotRef} style={styles.screenshotContainer}>
+        {selectedSticker && (
+          <Image
+            ref={stickerRef}
+            source={{ uri: selectedSticker }}
+            style={[styles.selectedSticker, { left: stickerPosition.x, top: stickerPosition.y }]}
+            {...panResponder.panHandlers}
+          />
+        )}
+      </ViewShot>
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#e0f7fa',
+    padding: Platform.OS === 'web' ? 20 : 0,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  image: {
+    width: 200,
+    height: 200,
+    marginTop: 20,
+    borderRadius: 10,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: Platform.OS === 'ios' ? 20 : 10,
+  },
+  sticker: {
+    width: 100,
+    height: 100,
+    margin: 10,
+  },
+  selectedSticker: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    marginTop: 20,
+    borderRadius: 10,
+  },
+  screenshotContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  button: {
+    backgroundColor: Platform.OS === 'ios' ? '#007AFF' : '#6200EE',
+    padding: 10,
+    borderRadius: 5,
+    margin: 5,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
+
+export default Explore;
